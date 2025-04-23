@@ -53,6 +53,7 @@ yarn install
 - Create a new Supabase project
 - Run the SQL from `supabase/schema.sql` in the Supabase SQL editor
 - Enable email authentication in the Auth settings
+- (Optional) Customize email templates in Authentication → Email Templates using the templates in `/branding/emails/`
 - Copy your Supabase URL and anon key
 
 4. Set up environment variables
@@ -103,6 +104,8 @@ yarn dev
   - `/src/types/supabase.ts`: Database types
 - `/supabase`: Supabase-related files
   - `/supabase/schema.sql`: SQL schema for Supabase setup
+- `/branding`: Branding and design assets
+  - `/branding/emails`: Email templates for Supabase authentication
 
 ## Future Enhancements
 
