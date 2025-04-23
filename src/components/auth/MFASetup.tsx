@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth/auth-context";
 import { createClient } from "@/lib/supabase/client";
-import Image from "next/image";
+// import Image from "next/image"; // Not using Next.js Image for SVG
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -21,6 +21,7 @@ export function MFASetup() {
   const [enrolling, setEnrolling] = useState<boolean>(false);
   const [mfaEnabled, setMfaEnabled] = useState<boolean>(false);
   const [checkingStatus, setCheckingStatus] = useState<boolean>(true);
+  const [qrCodeError, setQrCodeError] = useState<boolean>(false);
 
   // Check if MFA is already enabled
   useEffect(() => {
@@ -59,7 +60,12 @@ export function MFASetup() {
         return;
       }
 
-      setQrCode(qr);
+      // Ensure the QR code is properly encoded as a data URL
+      // The QR code from Supabase is already an SVG string
+      const encodedQr = qr.startsWith('data:') ? qr : `data:image/svg+xml;charset=utf-8,${encodeURIComponent(qr)}`;
+      console.log("Encoded QR code:", encodedQr.substring(0, 100) + '...');
+
+      setQrCode(encodedQr);
       setSecret(secret);
       console.log("MFA enrollment successful, QR code and secret set");
     } catch (error) {
@@ -226,17 +232,29 @@ export function MFASetup() {
                   Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
                 </p>
                 <div className="flex justify-center bg-white p-4 rounded-md">
-                  <Image
-                    src={qrCode}
-                    alt="QR Code for MFA"
-                    width={200}
-                    height={200}
-                  />
+                  {qrCodeError ? (
+                    <div className="text-center p-4 border border-dashed border-red-300 rounded-md">
+                      <p className="text-red-500 mb-2">Unable to display QR code</p>
+                      <p className="text-sm text-muted-foreground">Please use the manual setup code below</p>
+                    </div>
+                  ) : (
+                    <img
+                      src={qrCode}
+                      alt="QR Code for MFA"
+                      width={200}
+                      height={200}
+                      className="max-w-full h-auto"
+                      onError={() => {
+                        console.error("Error loading QR code image");
+                        setQrCodeError(true);
+                      }}
+                    />
+                  )}
                 </div>
               </div>
 
               <div>
-                <h3 className="text-sm font-medium">Step 2: Manual Setup (if QR code doesn't work)</h3>
+                <h3 className="text-sm font-medium">Step 2: Manual Setup (if QR code doesn&apos;t work)</h3>
                 <p className="text-sm text-muted-foreground mt-1 mb-2">
                   Enter this code manually in your authenticator app:
                 </p>
