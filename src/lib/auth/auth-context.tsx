@@ -127,21 +127,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // MFA enrollment function
   const enrollMFA = async () => {
     try {
+      console.log("Calling Supabase MFA enroll API...");
       const { data, error } = await supabase.auth.mfa.enroll({
         factorType: 'totp',
       });
 
+      console.log("Supabase MFA enroll response:", {
+        data: data ? 'exists' : 'null',
+        error: error || 'null',
+        totp: data?.totp ? 'exists' : 'null'
+      });
+
       if (error) {
+        console.error("Supabase MFA enroll error:", error);
         toast.error(error.message || "Failed to enroll MFA");
         return { qr: "", secret: "", error };
       }
 
+      if (!data || !data.totp) {
+        console.error("Supabase MFA enroll missing data:", data);
+        const customError = new Error("Missing TOTP data from Supabase");
+        toast.error("Failed to enroll MFA: Missing required data");
+        return { qr: "", secret: "", error: customError };
+      }
+
+      console.log("Supabase MFA enroll successful");
       return {
         qr: data.totp.qr_code,
         secret: data.totp.secret,
         error: null
       };
     } catch (error: any) {
+      console.error("Unexpected error in enrollMFA:", error);
       toast.error(error.message || "Failed to enroll MFA");
       return { qr: "", secret: "", error };
     }
@@ -150,32 +167,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Verify MFA during enrollment
   const verifyMFA = async (code: string) => {
     try {
-      const { data, error } = await supabase.auth.mfa.challenge({
-        factorId: 'totp',
-      });
-
-      if (error) {
-        toast.error(error.message || "Failed to challenge MFA");
-        return { success: false, error };
-      }
-
-      const challengeId = data.id;
-
-      const { data: verifyData, error: verifyError } = await supabase.auth.mfa.verify({
-        factorId: 'totp',
-        challengeId,
-        code,
-      });
-
-      if (verifyError) {
-        toast.error(verifyError.message || "Failed to verify MFA code");
-        return { success: false, error: verifyError };
-      }
-
-      toast.success("MFA enabled successfully");
-      return { success: true, error: null };
+      console.log("This function is deprecated. Use direct Supabase calls instead.");
+      return { success: false, error: new Error("This function is deprecated") };
     } catch (error: any) {
-      toast.error(error.message || "Failed to verify MFA");
+      console.error("Error in deprecated verifyMFA function:", error);
       return { success: false, error };
     }
   };

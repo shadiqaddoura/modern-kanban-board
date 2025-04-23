@@ -6,12 +6,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth/auth-context";
+import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 export function MFASetup() {
   const { enrollMFA, verifyMFA, unenrollMFA, isMFAEnabled } = useAuth();
+  const supabase = createClient();
   const [qrCode, setQrCode] = useState<string>("");
   const [secret, setSecret] = useState<string>("");
   const [verificationCode, setVerificationCode] = useState<string>("");
@@ -40,18 +42,29 @@ export function MFASetup() {
   const handleEnrollMFA = async () => {
     try {
       setEnrolling(true);
+      console.log("Starting MFA enrollment...");
       const { qr, secret, error } = await enrollMFA();
-      
+
+      console.log("MFA enrollment response:", { qr: !!qr, secret: !!secret, error });
+
       if (error) {
-        toast.error("Failed to set up MFA");
+        console.error("MFA enrollment error details:", error);
+        toast.error(`Failed to set up MFA: ${error.message || 'Unknown error'}`);
         return;
       }
-      
+
+      if (!qr || !secret) {
+        console.error("Missing QR code or secret");
+        toast.error("Failed to set up MFA: Missing required data");
+        return;
+      }
+
       setQrCode(qr);
       setSecret(secret);
+      console.log("MFA enrollment successful, QR code and secret set");
     } catch (error) {
       console.error("Error enrolling MFA:", error);
-      toast.error("Failed to set up MFA");
+      toast.error(`Failed to set up MFA: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setEnrolling(false);
     }
@@ -65,13 +78,36 @@ export function MFASetup() {
 
     try {
       setLoading(true);
-      const { success, error } = await verifyMFA(verificationCode);
-      
-      if (error || !success) {
-        toast.error("Failed to verify MFA code");
+      console.log("Verifying MFA code:", verificationCode, "for factorId:", factorId);
+
+      // First, create a challenge
+      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+        factorId,
+      });
+
+      if (challengeError) {
+        console.error("Challenge error:", challengeError);
+        toast.error(`Failed to create challenge: ${challengeError.message}`);
         return;
       }
-      
+
+      console.log("Challenge created:", challengeData);
+      const challengeId = challengeData.id;
+
+      // Then verify the code
+      const { data: verifyData, error: verifyError } = await supabase.auth.mfa.verify({
+        factorId,
+        challengeId,
+        code: verificationCode,
+      });
+
+      if (verifyError) {
+        console.error("Verification error:", verifyError);
+        toast.error(`Failed to verify code: ${verifyError.message}`);
+        return;
+      }
+
+      console.log("Verification successful:", verifyData);
       setMfaEnabled(true);
       setQrCode("");
       setSecret("");
@@ -79,7 +115,7 @@ export function MFASetup() {
       toast.success("MFA enabled successfully");
     } catch (error) {
       console.error("Error verifying MFA:", error);
-      toast.error("Failed to verify MFA code");
+      toast.error(`Failed to verify MFA code: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -89,12 +125,12 @@ export function MFASetup() {
     try {
       setLoading(true);
       const { success, error } = await unenrollMFA();
-      
+
       if (error || !success) {
         toast.error("Failed to disable MFA");
         return;
       }
-      
+
       setMfaEnabled(false);
       toast.success("MFA disabled successfully");
     } catch (error) {
@@ -128,14 +164,14 @@ export function MFASetup() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground mb-4">
-            Two-factor authentication adds an extra layer of security to your account. 
+            Two-factor authentication adds an extra layer of security to your account.
             In addition to your password, you'll need to enter a code from your authenticator app when signing in.
           </p>
         </CardContent>
         <CardFooter>
-          <Button 
-            variant="destructive" 
-            onClick={handleDisableMFA} 
+          <Button
+            variant="destructive"
+            onClick={handleDisableMFA}
             disabled={loading}
             className="w-full"
           >
@@ -163,11 +199,11 @@ export function MFASetup() {
         {!qrCode ? (
           <>
             <p className="text-sm text-muted-foreground">
-              Two-factor authentication adds an extra layer of security to your account. 
+              Two-factor authentication adds an extra layer of security to your account.
               In addition to your password, you'll need to enter a code from your authenticator app when signing in.
             </p>
-            <Button 
-              onClick={handleEnrollMFA} 
+            <Button
+              onClick={handleEnrollMFA}
               disabled={enrolling}
               className="w-full"
             >
@@ -190,15 +226,15 @@ export function MFASetup() {
                   Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
                 </p>
                 <div className="flex justify-center bg-white p-4 rounded-md">
-                  <Image 
-                    src={qrCode} 
-                    alt="QR Code for MFA" 
-                    width={200} 
-                    height={200} 
+                  <Image
+                    src={qrCode}
+                    alt="QR Code for MFA"
+                    width={200}
+                    height={200}
                   />
                 </div>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium">Step 2: Manual Setup (if QR code doesn't work)</h3>
                 <p className="text-sm text-muted-foreground mt-1 mb-2">
@@ -208,7 +244,7 @@ export function MFASetup() {
                   {secret}
                 </div>
               </div>
-              
+
               <div className="pt-4">
                 <h3 className="text-sm font-medium">Step 3: Verify Setup</h3>
                 <p className="text-sm text-muted-foreground mt-1 mb-3">
@@ -231,8 +267,8 @@ export function MFASetup() {
       </CardContent>
       {qrCode && (
         <CardFooter className="flex justify-between">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => {
               setQrCode("");
               setSecret("");
@@ -242,8 +278,8 @@ export function MFASetup() {
           >
             Cancel
           </Button>
-          <Button 
-            onClick={handleVerifyMFA} 
+          <Button
+            onClick={handleVerifyMFA}
             disabled={loading || verificationCode.length !== 6}
           >
             {loading ? (
