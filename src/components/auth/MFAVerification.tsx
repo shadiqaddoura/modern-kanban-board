@@ -30,68 +30,15 @@ export function MFAVerification({ onCancel }: MFAVerificationProps) {
       setLoading(true);
       console.log("Verifying MFA code:", verificationCode);
 
-      // Get the user's factors
-      const { data: factorsData, error: factorsError } = await supabase.auth.mfa.listFactors();
+      // Use the auth context's verifyMFAChallenge function
+      const { success, error } = await verifyMFAChallenge(verificationCode);
 
-      if (factorsError) {
-        console.error("Error listing factors:", factorsError);
-        toast.error(`Failed to list factors: ${factorsError.message}`);
+      if (!success || error) {
+        console.error("MFA verification failed:", error);
         return;
       }
 
-      // Find the first verified TOTP factor
-      const totpFactor = factorsData.totp.find(f => f.status === 'verified');
-
-      if (!totpFactor) {
-        console.error("No verified TOTP factor found");
-        toast.error("No verified authenticator found");
-        return;
-      }
-
-      console.log("Using factor:", totpFactor);
-
-      // Create a challenge
-      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
-        factorId: totpFactor.id,
-      });
-
-      if (challengeError) {
-        console.error("Challenge error:", challengeError);
-        toast.error(`Failed to create challenge: ${challengeError.message}`);
-        return;
-      }
-
-      console.log("Challenge created:", challengeData);
-
-      // Verify the code
-      const { data: verifyData, error: verifyError } = await supabase.auth.mfa.verify({
-        factorId: totpFactor.id,
-        challengeId: challengeData.id,
-        code: verificationCode,
-      });
-
-      if (verifyError) {
-        console.error("Verification error:", verifyError);
-        toast.error(`Failed to verify code: ${verifyError.message}`);
-        return;
-      }
-
-      console.log("Verification successful:", verifyData);
-      toast.success("MFA verified successfully");
-
-      // Refresh the session to update the AAL level
-      const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession();
-
-      if (sessionError) {
-        console.error("Session refresh error:", sessionError);
-        toast.error(`Failed to refresh session: ${sessionError.message}`);
-        return;
-      }
-
-      console.log("Session refreshed:", sessionData);
-
-      // Redirect to the dashboard
-      window.location.href = "/";
+      // The verifyMFAChallenge function handles the redirect and toast
     } catch (error) {
       console.error("Error verifying MFA:", error);
       toast.error(`Failed to verify MFA code: ${error instanceof Error ? error.message : 'Unknown error'}`);
