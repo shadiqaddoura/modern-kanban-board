@@ -1,8 +1,10 @@
 "use client";
 
 import { AppLayout } from "@/components/layout/AppLayout";
+import { MFASetup } from "@/components/auth/MFASetup";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useRouter } from "next/navigation";
 
@@ -17,7 +19,7 @@ export default function ProfilePage() {
 
   return (
     <AppLayout>
-      <div className="mx-auto max-w-md">
+      <div className="mx-auto max-w-md space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Profile</CardTitle>
@@ -47,6 +49,8 @@ export default function ProfilePage() {
             </Button>
           </CardFooter>
         </Card>
+
+        <MFASetup />
       </div>
     </AppLayout>
   );
