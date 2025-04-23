@@ -16,6 +16,7 @@ export function MFASetup() {
   const supabase = createClient();
   const [qrCode, setQrCode] = useState<string>("");
   const [secret, setSecret] = useState<string>("");
+  const [factorId, setFactorId] = useState<string>("");
   const [verificationCode, setVerificationCode] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [enrolling, setEnrolling] = useState<boolean>(false);
@@ -44,9 +45,19 @@ export function MFASetup() {
     try {
       setEnrolling(true);
       console.log("Starting MFA enrollment...");
-      const { qr, secret, error } = await enrollMFA();
 
-      console.log("MFA enrollment response:", { qr: !!qr, secret: !!secret, error });
+      // Generate a friendly name with a timestamp to ensure uniqueness
+      const friendlyName = `Authenticator ${new Date().toISOString()}`;
+      console.log("Using friendly name:", friendlyName);
+
+      const { qr, secret, factorId, error } = await enrollMFA(friendlyName);
+
+      console.log("MFA enrollment response:", {
+        qr: !!qr,
+        secret: !!secret,
+        factorId,
+        error
+      });
 
       if (error) {
         console.error("MFA enrollment error details:", error);
@@ -67,6 +78,7 @@ export function MFASetup() {
 
       setQrCode(encodedQr);
       setSecret(secret);
+      setFactorId(factorId || "");
       console.log("MFA enrollment successful, QR code and secret set");
     } catch (error) {
       console.error("Error enrolling MFA:", error);
@@ -171,7 +183,7 @@ export function MFASetup() {
         <CardContent>
           <p className="text-sm text-muted-foreground mb-4">
             Two-factor authentication adds an extra layer of security to your account.
-            In addition to your password, you'll need to enter a code from your authenticator app when signing in.
+            In addition to your password, you&apos;ll need to enter a code from your authenticator app when signing in.
           </p>
         </CardContent>
         <CardFooter>
@@ -206,7 +218,7 @@ export function MFASetup() {
           <>
             <p className="text-sm text-muted-foreground">
               Two-factor authentication adds an extra layer of security to your account.
-              In addition to your password, you'll need to enter a code from your authenticator app when signing in.
+              In addition to your password, you&apos;ll need to enter a code from your authenticator app when signing in.
             </p>
             <Button
               onClick={handleEnrollMFA}
@@ -290,6 +302,7 @@ export function MFASetup() {
             onClick={() => {
               setQrCode("");
               setSecret("");
+              setFactorId("");
               setVerificationCode("");
             }}
             disabled={loading}

@@ -19,7 +19,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ session: any; error: any; mfaRequired?: boolean }>;
   signOut: () => Promise<void>;
   // MFA related functions
-  enrollMFA: () => Promise<{ qr: string; secret: string; error: any }>;
+  enrollMFA: (friendlyName?: string) => Promise<{ qr: string; secret: string; factorId?: string; error: any }>;
   verifyMFA: (code: string) => Promise<{ success: boolean; error: any }>;
   unenrollMFA: () => Promise<{ success: boolean; error: any }>;
   isMFAEnabled: () => Promise<boolean>;
@@ -125,11 +125,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // MFA enrollment function
-  const enrollMFA = async () => {
+  const enrollMFA = async (friendlyName = "My Authenticator") => {
     try {
       console.log("Calling Supabase MFA enroll API...");
+
+      // First, check if there are any existing factors and unenroll them
+      const { data: factorsData, error: factorsError } = await supabase.auth.mfa.listFactors();
+
+      if (factorsError) {
+        console.error("Error listing MFA factors:", factorsError);
+        toast.error(`Failed to list MFA factors: ${factorsError.message}`);
+        return { qr: "", secret: "", error: factorsError };
+      }
+
+      // If there are existing TOTP factors, unenroll them first
+      if (factorsData.totp && factorsData.totp.length > 0) {
+        console.log(`Found ${factorsData.totp.length} existing TOTP factors, unenrolling...`);
+
+        for (const factor of factorsData.totp) {
+          console.log(`Unenrolling factor: ${factor.id}`);
+          const { error: unenrollError } = await supabase.auth.mfa.unenroll({
+            factorId: factor.id,
+          });
+
+          if (unenrollError) {
+            console.error(`Error unenrolling factor ${factor.id}:`, unenrollError);
+            toast.error(`Failed to unenroll existing MFA factor: ${unenrollError.message}`);
+            return { qr: "", secret: "", error: unenrollError };
+          }
+        }
+
+        console.log("Successfully unenrolled all existing factors");
+      }
+
+      // Now enroll a new factor with the provided friendly name
       const { data, error } = await supabase.auth.mfa.enroll({
         factorType: 'totp',
+        friendlyName: friendlyName,
       });
 
       console.log("Supabase MFA enroll response:", {
@@ -155,6 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return {
         qr: data.totp.qr_code,
         secret: data.totp.secret,
+        factorId: data.id,
         error: null
       };
     } catch (error: any) {
